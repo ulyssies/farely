@@ -42,8 +42,8 @@ export default function AIPromptBar({ onSearch, placeholder, prefilled, showTags
     <div className="w-full relative">
       <form
         onSubmit={handleSubmit}
-        className="border border-dashed border-stroke rounded-lg bg-surface-3 px-3.5 py-2.5 flex items-center gap-2"
-        style={{ borderWidth: '1.5px' }}
+        className="border border-dashed border-stroke rounded-lg bg-surface-3 px-3.5 flex items-center gap-2"
+        style={{ borderWidth: '1.5px', minHeight: '52px' }}
       >
         <span className="text-[13px] flex-shrink-0">✨</span>
         <input
@@ -52,19 +52,22 @@ export default function AIPromptBar({ onSearch, placeholder, prefilled, showTags
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder={placeholder ?? '"I have $400 and 5 days — where can I go from ATL?"'}
-          className="flex-1 bg-transparent text-[11px] text-ink placeholder-ink-muted italic focus:outline-none min-w-0"
+          className="flex-1 bg-transparent text-ink placeholder-ink-muted italic focus:outline-none min-w-0"
+          style={{ fontSize: '14px' }}
         />
-        {showTags && (
-          <div className="flex gap-1 flex-shrink-0">
-            <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#EEEDFE] text-[#534AB7] whitespace-nowrap">Claude API</span>
-            <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#E1F5EE] text-[#0F6E56] whitespace-nowrap">Kiwi Tequila</span>
-          </div>
-        )}
-        {!showTags && query.trim() && (
-          <button type="submit" className="text-[10px] font-semibold text-[#1D9E75] flex-shrink-0 hover:underline">
-            Go →
-          </button>
-        )}
+        <button type="submit" style={{
+          background: '#1D9E75',
+          color: 'white',
+          borderRadius: '8px',
+          padding: '8px 16px',
+          fontSize: '12px',
+          fontWeight: 600,
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}>
+          Search →
+        </button>
       </form>
 
       {focused && !query && (

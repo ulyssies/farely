@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import ThemeToggle from '@/components/ThemeToggle'
+import WelcomeModal from '@/components/WelcomeModal'
 
 export const metadata: Metadata = {
   title: 'Farely — Find Flights You\'ll Love',
@@ -28,7 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ` }} />
       </head>
       <body>
-        {children}
+        <div>
+          {children}
+        </div>
+        <WelcomeModal />
         <ThemeToggle />
       </body>
     </html>

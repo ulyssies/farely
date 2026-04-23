@@ -26,16 +26,20 @@ export default function SearchBar({
   const [dateFrom, setDateFrom] = useState(defaultDateFrom)
   const [dateTo, setDateTo] = useState(defaultDateTo)
   const [passengers, setPassengers] = useState(defaultPassengers)
+  const [error, setError] = useState('')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!from || !dateFrom) return
+    if (!from || !to) {
+      setError('Please enter an origin and destination')
+      return
+    }
+    setError('')
     const params = new URLSearchParams({
-      fly_from: from.toUpperCase(),
-      date_from: dateFrom,
-      date_to: dateTo || dateFrom,
-      adults: String(passengers),
-      ...(to && { fly_to: to.toUpperCase() }),
+      from: from.toUpperCase(),
+      to: to.toUpperCase(),
+      depart: dateFrom,
+      ...(dateTo && { return: dateTo }),
     })
     router.push(`/results?${params.toString()}`)
   }
@@ -68,26 +72,71 @@ export default function SearchBar({
     )
   }
 
+  const inputStyle: React.CSSProperties = {
+    background: '#f5f5f5',
+    border: '1px solid #e5e5e5',
+    borderRadius: '10px',
+    height: '48px',
+    padding: '0 16px',
+    fontSize: '14px',
+    color: '#1a1a1a',
+    outline: 'none',
+    flex: 1,
+    minWidth: '100px',
+  }
+
   return (
     <div className="w-full">
-      <div className="border border-stroke rounded-xl p-2.5 flex items-center gap-2 bg-surface flex-wrap">
-        <input value={from} onChange={e => setFrom(e.target.value.toUpperCase())} placeholder="✈ From (origin)"
-          required maxLength={3} className={`${inputCls} flex-1 min-w-[100px] h-9 px-3`} />
-        <input value={to} onChange={e => setTo(e.target.value.toUpperCase())} placeholder="To (destination)"
-          maxLength={3} className={`${inputCls} flex-1 min-w-[100px] h-9 px-3`} />
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: 'white',
+        borderRadius: '14px',
+        padding: '10px',
+        border: '1px solid #f0f0f0',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        flexWrap: 'wrap',
+      }}>
+        <input value={from} onChange={e => setFrom(e.target.value.toUpperCase())} placeholder="✈ From (IATA)"
+          required maxLength={3} style={{ ...inputStyle, minWidth: '120px' }} />
+        <input value={to} onChange={e => setTo(e.target.value.toUpperCase())} placeholder="To (IATA)"
+          maxLength={3} style={{ ...inputStyle, minWidth: '120px' }} />
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          required className={`${inputCls} w-[90px] h-9 px-2`} />
+          required style={{ ...inputStyle, flex: 'none', width: '140px' }} />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className={`${inputCls} w-[90px] h-9 px-2`} />
-        <button type="submit" onClick={handleSubmit}
-          className="w-20 h-9 bg-[#1D9E75] text-white text-[11px] font-semibold rounded-lg hover:bg-[#179968] transition-colors flex-shrink-0">
+          style={{ ...inputStyle, flex: 'none', width: '140px' }} />
+        <button type="submit" onClick={handleSubmit} style={{
+          background: '#1D9E75',
+          color: 'white',
+          borderRadius: '10px',
+          height: '48px',
+          padding: '0 24px',
+          fontSize: '14px',
+          fontWeight: 600,
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}>
           Search
         </button>
       </div>
-      <div className="flex gap-1.5 flex-wrap mt-2.5 justify-center">
-        {['One way', 'Round trip', 'Multi-city', '1 adult', 'Economy'].map(label => (
-          <span key={label}
-            className="bg-surface-2 border border-stroke rounded-full px-[10px] py-[3px] text-[10px] text-ink cursor-pointer hover:border-[#1D9E75] hover:text-[#1D9E75] transition-colors">
+      {error && (
+        <p style={{ color: '#D85A30', fontSize: '12px', marginTop: '8px', textAlign: 'left' }}>{error}</p>
+      )}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px', justifyContent: 'center' }}>
+        {['Round trip', 'One way', 'Multi-city', '1 adult', 'Economy'].map((label, i) => (
+          <span key={label} style={{
+            background: i === 0 ? '#0a0a0a' : 'white',
+            border: `1px solid ${i === 0 ? '#0a0a0a' : '#e5e5e5'}`,
+            borderRadius: '99px',
+            padding: '6px 14px',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: i === 0 ? 'white' : '#555',
+            cursor: 'pointer',
+          }}>
             {label}
           </span>
         ))}

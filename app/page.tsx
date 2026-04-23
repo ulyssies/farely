@@ -1,102 +1,196 @@
-import dynamic from 'next/dynamic'
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
 import SearchBar from '@/components/SearchBar'
 import AIPromptBar from '@/components/AIPromptBar'
 import DealCard from '@/components/DealCard'
-import NavTabs from '@/components/NavTabs'
-import { searchAnywhere } from '@/lib/tequila'
-import { fetchMultipleCityPhotos } from '@/lib/unsplash'
+import MapSection from '@/components/MapSection'
 
-const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false })
+const DEALS = [
+  { city: 'Cancún',       country: 'Mexico',        iata: 'CUN', price: 189, stops: 0, duration: '3h 45m' },
+  { city: 'Miami',        country: 'Florida',        iata: 'MIA', price: 58,  stops: 0, duration: '1h 40m' },
+  { city: 'New York',     country: 'New York',       iata: 'JFK', price: 67,  stops: 0, duration: '2h 15m' },
+  { city: 'London',       country: 'England',        iata: 'LHR', price: 312, stops: 1, duration: '9h 10m' },
+  { city: 'Paris',        country: 'France',         iata: 'CDG', price: 389, stops: 1, duration: '9h 45m' },
+  { city: 'Tokyo',        country: 'Japan',          iata: 'NRT', price: 589, stops: 1, duration: '14h 30m' },
+  { city: 'San Juan',     country: 'Puerto Rico',    iata: 'SJU', price: 214, stops: 0, duration: '3h 10m' },
+  { city: 'Los Angeles',  country: 'California',     iata: 'LAX', price: 129, stops: 0, duration: '4h 30m' },
+  { city: 'Mexico City',  country: 'Mexico',         iata: 'MEX', price: 187, stops: 0, duration: '3h 45m' },
+  { city: 'Vancouver',    country: 'Canada',         iata: 'YVR', price: 198, stops: 1, duration: '6h 20m' },
+]
 
-async function getTopDeals() {
-  try {
-    const today = new Date()
-    const from = new Date(today)
-    from.setDate(from.getDate() + 7)
-    const to = new Date(from)
-    to.setDate(to.getDate() + 30)
-    const flights = await searchAnywhere('LAX', from.toISOString().slice(0, 10), to.toISOString().slice(0, 10), 8)
-    const cities = Array.from(new Set(flights.map(f => f.cityTo)))
-    const photos = await fetchMultipleCityPhotos(cities)
-    return flights.map(f => ({ ...f, photo: photos[f.cityTo] ?? null }))
-  } catch { return [] }
-}
+const ALL_PRICES = DEALS.map(d => d.price)
 
 const COORD_MAP: Record<string, [number, number]> = {
-  'MX': [-99.1, 19.4], 'JP': [139.7, 35.7], 'FR': [2.3, 48.9], 'GB': [-0.1, 51.5],
-  'TH': [100.5, 13.8], 'IT': [12.5, 41.9], 'ES': [-3.7, 40.4], 'AU': [151.2, -33.9],
-  'BR': [-43.2, -22.9], 'DE': [13.4, 52.5], 'PE': [-77.0, -12.0], 'CR': [-84.1, 9.9],
+  'CUN': [-86.9, 21.0], 'MIA': [-80.3, 25.8], 'JFK': [-73.8, 40.6],
+  'LHR': [-0.5, 51.5],  'CDG': [2.5, 49.0],   'NRT': [140.4, 35.8],
+  'SJU': [-66.0, 18.4], 'LAX': [-118.4, 33.9], 'MEX': [-99.1, 19.4],
+  'YVR': [-123.2, 49.2],
 }
 
-export default async function HomePage() {
-  const deals = await getTopDeals()
-
-  const sampleArcs = deals.slice(0, 6).map(d => ({
-    from: [-118.2, 33.9] as [number, number],
-    to: (COORD_MAP[d.countryTo.code] ?? [0, 0]) as [number, number],
-    label: d.cityTo,
+export default function HomePage() {
+  const [searchMode, setSearchMode] = useState<'classic' | 'ai'>('classic')
+  const sampleArcs = DEALS.slice(0, 6).map(d => ({
+    from: [-84.4, 33.7] as [number, number],
+    to: (COORD_MAP[d.iata] ?? [0, 0]) as [number, number],
+    label: d.city,
   }))
 
   return (
     <main className="min-h-screen bg-page py-5 px-4 pb-20">
-      <NavTabs />
-      <div className="max-w-[900px] mx-auto border border-stroke rounded-xl overflow-hidden bg-surface">
+      <div className="max-w-[1100px] mx-auto border border-stroke rounded-xl overflow-hidden bg-surface">
 
         {/* Nav */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-stroke-light">
-          <div className="w-20 h-[26px] bg-surface-2 border border-stroke rounded-lg flex items-center justify-center text-[11px] font-semibold text-ink">
-            LOGO
-          </div>
-          <div className="flex gap-4 text-[11px] text-ink-muted">
-            <a href="#deals" className="hover:text-ink transition-colors">Deals</a>
-            <a href="#" className="hover:text-ink transition-colors">Explore map</a>
-            <a href="#" className="hover:text-ink transition-colors">Sign in</a>
+        <div className="flex items-center justify-between bg-white" style={{ padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
+          <span style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.5px', color: '#0a0a0a' }}>
+            fare<span style={{ color: '#1D9E75' }}>ly</span>
+          </span>
+          <div className="flex items-center" style={{ gap: '20px' }}>
+            <div className="flex items-center" style={{ gap: '28px' }}>
+              <Link href="#deals" className="text-[13px] text-[#888] font-normal hover:text-[#0a0a0a] transition-colors" style={{ textDecoration: 'none' }}>Deals</Link>
+              <Link href="/discover" className="text-[13px] text-[#888] font-normal hover:text-[#0a0a0a] transition-colors" style={{ textDecoration: 'none' }}>Explore map</Link>
+              <Link href="/signin" className="text-[13px] text-[#888] font-normal hover:text-[#0a0a0a] transition-colors" style={{ textDecoration: 'none' }}>Sign in</Link>
+            </div>
+            <Link href="/discover" className="border border-[#0a0a0a] text-[#0a0a0a] bg-transparent hover:bg-[#0a0a0a] hover:text-white transition-colors" style={{ borderRadius: '8px', padding: '7px 16px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+              Get started
+            </Link>
           </div>
         </div>
 
         {/* Hero */}
-        <div className="px-6 pt-9 pb-6 text-center border-b border-stroke-light">
-          <div className="bg-surface-2 border border-stroke rounded-lg h-[30px] max-w-[420px] mx-auto mb-2 flex items-center justify-center text-[13px] font-semibold text-ink">
-            "Your next flight. Cheaper than you think."
+        <div style={{ textAlign: 'center', padding: '48px 24px 32px', borderBottom: '1px solid #e8e8e8' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#E1F5EE',
+            border: '1px solid #9FE1CB',
+            borderRadius: '99px',
+            padding: '4px 12px',
+            fontSize: '11px',
+            fontWeight: 500,
+            color: '#0F6E56',
+            marginBottom: '20px',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
+            Real-time flight prices · AI-powered
           </div>
-          <div className="bg-surface-2 border border-stroke rounded-lg h-[18px] max-w-[260px] mx-auto mb-6 flex items-center justify-center text-[10px] text-ink-muted">
-            Real-time deals powered by AI
+
+          <h1 style={{
+            fontSize: '42px',
+            fontWeight: 700,
+            color: '#0a0a0a',
+            letterSpacing: '-1px',
+            lineHeight: 1.15,
+            marginBottom: '12px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          }}>
+            Find flights<br />
+            <span style={{ color: '#1D9E75' }}>you'll actually love</span>
+          </h1>
+
+          <p style={{
+            fontSize: '15px',
+            color: '#888',
+            fontWeight: 400,
+            lineHeight: 1.6,
+            maxWidth: '400px',
+            margin: '0 auto 32px',
+          }}>
+            Tell us where you want to feel. Our AI finds the
+            flights that match your vibe and budget.
+          </p>
+
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            background: '#f5f5f5',
+            border: '1px solid #e5e5e5',
+            borderRadius: '99px',
+            padding: '3px',
+            width: 'fit-content',
+            margin: '0 auto 16px',
+          }}>
+            <button
+              onClick={() => setSearchMode('classic')}
+              style={{
+                padding: '6px 18px',
+                borderRadius: '99px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                background: searchMode === 'classic' ? 'white' : 'transparent',
+                color: searchMode === 'classic' ? '#0a0a0a' : '#888',
+                boxShadow: searchMode === 'classic' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              Classic search
+            </button>
+            <button
+              onClick={() => setSearchMode('ai')}
+              style={{
+                padding: '6px 18px',
+                borderRadius: '99px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                background: searchMode === 'ai' ? '#1D9E75' : 'transparent',
+                color: searchMode === 'ai' ? 'white' : '#888',
+                boxShadow: searchMode === 'ai' ? '0 1px 4px rgba(29,158,117,0.3)' : 'none',
+              }}
+            >
+              ✦ AI search
+            </button>
           </div>
-          <div className="mb-2"><SearchBar /></div>
-          <div className="flex items-center gap-2 my-3">
-            <div className="flex-1 h-px bg-stroke-light" />
-            <span className="text-[10px] text-ink-muted">or use AI search</span>
-            <div className="flex-1 h-px bg-stroke-light" />
-          </div>
-          <AIPromptBar showTags />
+
+          {searchMode === 'classic' && <SearchBar />}
+          {searchMode === 'ai' && <AIPromptBar />}
         </div>
 
         {/* Map strip */}
-        <div className="h-48 bg-page">
-          <WorldMap arcs={sampleArcs} origin={[-118.2, 33.9]} className="w-full h-full" />
+        <div style={{ padding: '20px 24px 24px' }}>
+          <p style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: '#aaa',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            margin: '0 0 12px',
+          }}>
+            Popular Routes from ATL
+          </p>
+          <div style={{ border: '1px solid #e8e8e8', borderRadius: '12px', overflow: 'hidden' }}>
+            <MapSection arcs={sampleArcs} />
+          </div>
         </div>
 
         {/* Deal cards */}
         <div id="deals" className="px-4 py-3.5">
           <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[12px] font-semibold text-ink">Popular deals from your location</span>
+            <span className="text-[13px] font-semibold text-ink">Popular deals from Atlanta</span>
             <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#E1F5EE] text-[#0F6E56]">
-              Kiwi Tequila · fly_to=anywhere
+              Live prices · ATL
             </span>
           </div>
-          {deals.length > 0 ? (
-            <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
-              {deals.map(deal => (
-                <DealCard key={deal.id} flyFrom={deal.flyFrom} flyTo={deal.flyTo}
-                  cityTo={deal.cityTo} countryTo={deal.countryTo.name}
-                  price={deal.price} dTime={deal.dTime} photo={deal.photo} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-10 text-ink-muted text-[11px]">
-              Add your Tequila API key to see live deals.
-            </div>
-          )}
+          <div className="grid gap-[10px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+            {DEALS.map((deal, i) => (
+              <DealCard
+                key={deal.iata}
+                city={deal.city}
+                country={deal.country}
+                iata={deal.iata}
+                price={deal.price}
+                stops={deal.stops}
+                duration={deal.duration}
+                origin="ATL"
+                allPrices={ALL_PRICES}
+                index={i}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Price alert */}
