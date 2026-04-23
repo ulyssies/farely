@@ -7,76 +7,100 @@ import { Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import SearchBar from '@/components/SearchBar'
 import PriceCalendar from '@/components/PriceCalendar'
-import type { AmadeusFlight } from '@/lib/amadeus'
+import type { TravelpayoutsTicket } from '@/lib/travelpayouts'
 
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false })
 
 const COORD_MAP: Record<string, [number, number]> = {
   'MEX': [-99.1, 19.4], 'NRT': [140.4, 35.8], 'CDG': [2.5, 49.0], 'LHR': [-0.5, 51.5],
   'BKK': [100.5, 13.8], 'FCO': [12.5, 41.9], 'MAD': [-3.7, 40.4], 'SYD': [151.2, -33.9],
-  'GIG': [-43.2, -22.9], 'TXL': [13.4, 52.5], 'LIM': [-77.0, -12.0], 'SJO': [-84.1, 9.9],
   'LAX': [-118.4, 33.9], 'YYZ': [-79.4, 43.7], 'SCL': [-70.7, -33.5], 'BOG': [-74.1, 4.7],
-  'LIS': [-9.1, 38.7], 'ATH': [23.7, 37.9], 'MIA': [-80.3, 25.8], 'JFK': [-73.8, 40.6],
+  'LIS': [-9.1, 38.7],  'ATH': [23.7, 37.9],  'MIA': [-80.3, 25.8], 'JFK': [-73.8, 40.6],
   'CUN': [-86.9, 21.0], 'SJU': [-66.0, 18.4], 'ORD': [-87.9, 41.9], 'DFW': [-97.0, 32.9],
-  'ATL': [-84.4, 33.7], 'YVR': [-123.2, 49.2],
+  'ATL': [-84.4, 33.7], 'YVR': [-123.2, 49.2], 'BCN': [2.1, 41.4], 'AMS': [4.9, 52.3],
+  'DEN': [-104.9, 39.7], 'SFO': [-122.4, 37.8], 'BOS': [-71.1, 42.4], 'SEA': [-122.3, 47.6],
 }
 
-function formatDuration(iso: string): string {
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
-  if (!m) return iso
-  const h = m[1] ? `${m[1]}h ` : ''
-  const min = m[2] ? `${m[2]}m` : ''
-  return `${h}${min}`.trim()
+function getPriceColor(price: number, mean: number): string {
+  const pct = price / mean
+  if (pct <= 0.8) return '#1D9E75'
+  if (pct <= 1.1) return '#BA7517'
+  return '#D85A30'
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+interface FlightRowProps {
+  flight: TravelpayoutsTicket
+  mean: number
+  isBestDeal: boolean
 }
 
-function FlightRow({ flight }: { flight: AmadeusFlight }) {
-  const priceColor = flight.price < 150 ? '#1D9E75' : flight.price < 350 ? '#BA7517' : '#D85A30'
+function FlightRow({ flight, mean, isBestDeal }: FlightRowProps) {
+  const color = getPriceColor(flight.price, mean)
+  const departTime = flight.departureAt
+    ? new Date(flight.departureAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null
+  const stopsLabel = flight.stops === 0 ? 'Nonstop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`
+  const fullLink = flight.bookingLink.startsWith('http')
+    ? flight.bookingLink
+    : `https://www.aviasales.com${flight.bookingLink}`
+
   return (
-    <a
-      href={flight.bookingLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{ textDecoration: 'none' }}
-      className="block px-2.5 py-2 border-b border-stroke-light hover:bg-surface-2 transition-colors"
+    <div
+      onClick={() => window.open(fullLink, '_blank', 'noopener,noreferrer')}
+      className="block px-2.5 py-2.5 border-b border-stroke-light hover:bg-surface-2 transition-colors cursor-pointer"
     >
-      <div className="flex items-center justify-between mb-0.5">
-        <span className="text-[11px] font-semibold text-ink">{flight.origin} → {flight.destination}</span>
-        <span className="text-[12px] font-bold" style={{ color: priceColor }}>${flight.price}</span>
+      {isBestDeal && (
+        <div className="text-[9px] font-semibold mb-1" style={{ color: '#0F6E56' }}>BEST DEAL</div>
+      )}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          {flight.airline && (
+            <div className="bg-surface-2 border border-stroke rounded text-[8px] text-ink-muted px-1.5 py-0.5 inline-block mb-1">
+              {flight.airline}
+            </div>
+          )}
+          {departTime && (
+            <div className="text-[12px] font-semibold text-ink">{departTime}</div>
+          )}
+          <div className="text-[10px] text-ink-muted">
+            {stopsLabel} · {flight.duration}
+          </div>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <div className="text-[20px] font-semibold leading-none" style={{ color }}>${flight.price}</div>
+          <div className="mt-1 inline-flex items-center justify-center px-3 h-[26px] bg-[#1D9E75] text-white text-[10px] font-medium rounded-lg hover:bg-[#179968] transition-colors">
+            Book →
+          </div>
+          <div className="text-[8px] text-ink-muted mt-0.5">via Aviasales</div>
+        </div>
       </div>
-      <div className="flex items-center gap-2 text-[9px] text-ink-muted">
-        <span>{formatTime(flight.departureTime)} – {formatTime(flight.arrivalTime)}</span>
-        <span>·</span>
-        <span>{formatDuration(flight.duration)}</span>
-        <span>·</span>
-        <span>{flight.stops === 0 ? 'Nonstop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`}</span>
-        <span className="ml-auto">{flight.airline}</span>
-      </div>
-    </a>
+    </div>
   )
 }
 
 function ResultsInner() {
   const searchParams = useSearchParams()
-  const from = searchParams.get('from') ?? 'LAX'
+  // TODO: detect user location via IP geolocation
+  const from = searchParams.get('from') ?? 'ATL'
   const to = searchParams.get('to') ?? ''
-  const departureDate = searchParams.get('depart') ?? ''
-  const returnDate = searchParams.get('return') ?? ''
-  const adults = searchParams.get('adults') ?? '1'
+  const fromName = searchParams.get('fromName') ?? (from ? `${from}` : 'Atlanta (ATL)')
+  const toName = searchParams.get('toName') ?? to
+  const defaultDepart = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const departDate = searchParams.get('depart') ?? searchParams.get('departDate') ?? defaultDepart
+  const returnDate = searchParams.get('return') ?? searchParams.get('returnDate') ?? ''
 
-  const [flights, setFlights] = useState<AmadeusFlight[]>([])
+  const [flights, setFlights] = useState<TravelpayoutsTicket[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!from || !to || !departureDate) return
+    if (!from || !to) return
+    setFlights([])
     setLoading(true)
     setError(null)
 
-    const params = new URLSearchParams({ from, to, departureDate, adults })
+    const params = new URLSearchParams({ from, to })
+    if (departDate) params.append('departDate', departDate)
     if (returnDate) params.append('returnDate', returnDate)
 
     fetch(`/api/flights?${params}`)
@@ -87,7 +111,10 @@ function ResultsInner() {
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
-  }, [from, to, departureDate, returnDate, adults])
+  }, [from, to, departDate, returnDate])
+
+  const allPrices = flights.map(f => f.price)
+  const mean = allPrices.length > 0 ? allPrices.reduce((a, b) => a + b, 0) / allPrices.length : 300
 
   const originCoord: [number, number] = COORD_MAP[from] ?? [-95.7, 37.1]
   const destCoord = to ? COORD_MAP[to] : null
@@ -98,6 +125,8 @@ function ResultsInner() {
         to: (COORD_MAP[f.destination] ?? [0, 0]) as [number, number],
         label: f.destination,
       }))
+
+  const calendarMonth = departDate ? departDate.slice(0, 7) : new Date().toISOString().slice(0, 7)
 
   return (
     <main className="min-h-screen bg-page py-5 px-4 pb-20">
@@ -110,9 +139,11 @@ function ResultsInner() {
               fare<span style={{ color: '#1D9E75' }}>ly</span>
             </span>
           </Link>
-          <SearchBar compact defaultOrigin={from} defaultDest={to}
-            defaultDateFrom={departureDate} defaultDateTo={returnDate}
-            defaultPassengers={parseInt(adults)} />
+          <SearchBar compact
+            defaultOrigin={from} defaultOriginName={fromName}
+            defaultDest={to} defaultDestName={toName}
+            defaultDateFrom={departDate} defaultDateTo={returnDate}
+            defaultPassengers={1} />
         </div>
 
         {/* Filter bar */}
@@ -133,16 +164,18 @@ function ResultsInner() {
           {/* Sidebar */}
           <div className="w-[300px] flex-shrink-0 overflow-y-auto bg-surface">
             <div className="px-2.5 py-1.5 border-b border-stroke-light text-[10px] text-ink-muted">
-              {loading ? (
-                <span>Searching...</span>
-              ) : (
-                <span>Showing <strong className="text-ink">{flights.length} flights</strong>{to && ` · ${from} → ${to}`}</span>
-              )}
+              {loading
+                ? <span>Searching {from}{to ? ` → ${to}` : ''}…</span>
+                : <span>Showing <strong className="text-ink">{flights.length} flights</strong>{to && ` · ${from} → ${to}`}</span>
+              }
             </div>
 
             {loading && (
-              <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <div className="w-5 h-5 border-2 border-[#1D9E75] border-t-transparent rounded-full animate-spin" />
+                <p className="text-[13px] text-ink-muted italic text-center animate-pulse">
+                  Searching flights…
+                </p>
               </div>
             )}
 
@@ -157,9 +190,15 @@ function ResultsInner() {
               </div>
             )}
 
-            {!loading && flights.map(f => <FlightRow key={f.id} flight={f} />)}
+            {!loading && flights.map((f, i) => (
+              <FlightRow key={`${f.destination}-${i}`} flight={f} mean={mean} isBestDeal={i === 0} />
+            ))}
 
-            {to && !loading && <div className="p-2.5"><PriceCalendar flyFrom={from} flyTo={to} /></div>}
+            {to && !loading && (
+              <div className="p-2.5">
+                <PriceCalendar flyFrom={from} flyTo={to} month={calendarMonth} />
+              </div>
+            )}
           </div>
         </div>
 

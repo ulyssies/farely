@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { formatDuration, buildSkyscannerLink } from '@/lib/tequila'
+import { formatDuration, buildAviasalesLink } from '@/lib/travelpayouts'
 
 interface FlightCardProps {
   id: string
@@ -9,12 +9,13 @@ interface FlightCardProps {
   flyTo: string
   cityFrom: string
   cityTo: string
-  countryTo: { name: string; code: string }
+  countryTo?: { name: string; code: string }
   price: number
   dTime: number
   aTime: number
-  duration: { total: number }
+  duration: { total: number; departure?: string | number }
   airlines: string[]
+  deep_link?: string
   photo?: string | null
   ranking?: { score?: number; reason?: string; tags?: string[] }
   isBestDeal?: boolean
@@ -27,15 +28,23 @@ function priceColor(price: number): string {
   return 'text-[#993C1D]'
 }
 
-export default function FlightCard(props: FlightCardProps) {
-  const { flyFrom, flyTo, cityTo, countryTo, price, dTime, aTime, duration, airlines, photo, ranking, isBestDeal, compact } = props
+function displayDuration(duration: FlightCardProps['duration']): string {
+  if (duration.total > 0) return formatDuration(duration.total)
+  if (typeof duration.departure === 'string' && duration.departure) return duration.departure
+  return ''
+}
 
-  const bookingLink = buildSkyscannerLink(flyFrom, flyTo, dTime)
-  const departTime = new Date(dTime * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-  const arriveTime = new Date(aTime * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+export default function FlightCard(props: FlightCardProps) {
+  const { flyFrom, flyTo, cityTo, countryTo, price, dTime, aTime, duration, airlines, deep_link, photo, ranking, isBestDeal, compact } = props
+
+  const rawLink = deep_link || buildAviasalesLink(flyFrom, flyTo, dTime)
+  const bookingLink = rawLink.startsWith('http') ? rawLink : `https://www.aviasales.com${rawLink}`
+  const openBooking = () => window.open(bookingLink, '_blank', 'noopener,noreferrer')
+  const hasTime = dTime > 0
+  const departTime = hasTime ? new Date(dTime * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : null
+  const arriveTime = hasTime ? new Date(aTime * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : null
   const stops = airlines.length > 1 ? `${airlines.length - 1} stop` : 'Nonstop'
 
-  // Compact = results sidebar (no image, just times + price)
   if (compact) {
     return (
       <div className="px-2.5 py-2.5 border-b border-stroke-light last:border-b-0">
@@ -47,23 +56,24 @@ export default function FlightCard(props: FlightCardProps) {
             <div className="bg-surface-2 border border-stroke rounded text-[8px] text-ink-muted px-1.5 py-0.5 inline-block mb-1.5">
               {airlines[0] ?? 'Airline'}
             </div>
-            <div className="text-[12px] font-semibold text-ink">{departTime} → {arriveTime}</div>
-            <div className="text-[10px] text-ink-muted">{stops} · {formatDuration(duration.total)}</div>
+            {hasTime && (
+              <div className="text-[12px] font-semibold text-ink">{departTime} → {arriveTime}</div>
+            )}
+            <div className="text-[10px] text-ink-muted">{stops} · {displayDuration(duration)}</div>
           </div>
           <div className="text-right flex-shrink-0">
             <div className={`text-[20px] font-semibold leading-none ${priceColor(price)}`}>${price}</div>
-            <a href={bookingLink} target="_blank" rel="noopener noreferrer"
+            <button onClick={(e) => { e.stopPropagation(); openBooking() }}
               className="mt-1 inline-flex items-center justify-center w-[68px] h-[26px] bg-[#1D9E75] text-white text-[10px] font-medium rounded-lg hover:bg-[#179968] transition-colors">
               Book →
-            </a>
-            <div className="text-[8px] text-ink-muted mt-1">via Skyscanner</div>
+            </button>
+            <div className="text-[8px] text-ink-muted mt-1">via Aviasales</div>
           </div>
         </div>
       </div>
     )
   }
 
-  // Default = chat card (small image + city/price row)
   return (
     <div className="border border-stroke-card rounded-lg overflow-hidden bg-surface">
       <div className="h-[50px] bg-placeholder relative overflow-hidden flex items-center justify-center">
@@ -75,15 +85,17 @@ export default function FlightCard(props: FlightCardProps) {
       </div>
       <div className="px-2 py-1.5 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold text-ink truncate">{cityTo}, {countryTo.code}</div>
-          <div className="text-[9px] text-ink-muted">{ranking?.tags?.[0] ?? stops} · {formatDuration(duration.total)}</div>
+          <div className="text-[11px] font-semibold text-ink truncate">
+            {cityTo}{countryTo?.code ? `, ${countryTo.code}` : ''}
+          </div>
+          <div className="text-[9px] text-ink-muted">{ranking?.tags?.[0] ?? stops} · {displayDuration(duration)}</div>
         </div>
         <div className="text-right flex-shrink-0">
           <div className={`text-[14px] font-semibold leading-none ${priceColor(price)}`}>${price}</div>
-          <a href={bookingLink} target="_blank" rel="noopener noreferrer"
+          <button onClick={(e) => { e.stopPropagation(); openBooking() }}
             className="mt-1 inline-flex items-center justify-center w-[50px] h-[22px] bg-[#1D9E75] text-white text-[9px] font-medium rounded-lg hover:bg-[#179968] transition-colors">
             Book →
-          </a>
+          </button>
         </div>
       </div>
     </div>

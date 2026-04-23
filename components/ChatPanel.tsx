@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import type { FlightResult } from '@/lib/tequila'
+import type { FlightResult } from '@/lib/travelpayouts'
 import type { ParsedQuery } from '@/lib/claude'
 import FlightCard from '@/components/FlightCard'
 
@@ -99,7 +99,7 @@ export default function ChatPanel({ initialQuery, onResultsChange }: ChatPanelPr
         <span className="text-[11px] font-semibold text-ink">AI flight search</span>
         <div className="ml-auto flex gap-1">
           <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#EEEDFE] text-[#534AB7]">Claude API</span>
-          <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#E1F5EE] text-[#0F6E56]">Kiwi Tequila</span>
+          <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#E1F5EE] text-[#0F6E56]">Travelpayouts</span>
         </div>
       </div>
 
@@ -159,7 +159,9 @@ export default function ChatPanel({ initialQuery, onResultsChange }: ChatPanelPr
         {loading && (
           <div className="flex gap-1.5 items-start">
             <div className="w-5 h-5 rounded-full bg-placeholder flex items-center justify-center text-[8px] font-semibold text-ink-muted flex-shrink-0">AI</div>
-            <div className="bg-surface-2 px-2.5 py-2" style={{ borderRadius: '2px 12px 12px 12px' }}>
+            <div className="bg-surface-2 px-2.5 py-2 flex flex-col gap-1.5" style={{ borderRadius: '2px 12px 12px 12px' }}>
+              {/* TODO: detect user location via IP geolocation */}
+              <span className="text-[10px] text-ink-muted italic">Searching routes from ATL…</span>
               <div className="flex gap-1">
                 {[0,1,2].map(i => (
                   <div key={i} className="w-1.5 h-1.5 rounded-full bg-ink-muted animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />

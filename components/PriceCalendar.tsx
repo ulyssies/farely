@@ -7,7 +7,7 @@ interface DayPrice { date: string; price: number | null }
 interface PriceCalendarProps {
   flyFrom: string
   flyTo: string
-  baseDate?: Date
+  month?: string // YYYY-MM, defaults to current month
 }
 
 function cellStyle(price: number, min: number, max: number): { bg: string; color: string } {
@@ -18,48 +18,32 @@ function cellStyle(price: number, min: number, max: number): { bg: string; color
   return               { bg: '#FAECE7', color: '#993C1D' }
 }
 
-function getDatesForWeek(base: Date): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(base)
-    d.setDate(d.getDate() + i)
-    return d.toISOString().slice(0, 10)
-  })
-}
-
-export default function PriceCalendar({ flyFrom, flyTo, baseDate }: PriceCalendarProps) {
+export default function PriceCalendar({ flyFrom, flyTo, month }: PriceCalendarProps) {
   const [days, setDays] = useState<DayPrice[]>([])
   const [loading, setLoading] = useState(true)
   const [cheapestDate, setCheapestDate] = useState<string | null>(null)
 
   useEffect(() => {
-    const base = baseDate ?? new Date()
-    base.setDate(base.getDate() + 7)
-    const dates = getDatesForWeek(base)
-    setDays(dates.map(date => ({ date, price: null })))
     setLoading(true)
+    const targetMonth = month || new Date().toISOString().slice(0, 7)
 
-    const fetchPrices = async () => {
-      const results = await Promise.allSettled(
-        dates.map(async date => {
-          const params = new URLSearchParams({ fly_from: flyFrom, fly_to: flyTo, date_from: date, date_to: date, limit: '1' })
-          const res = await fetch(`/api/flights?${params}`)
-          if (!res.ok) return { date, price: null }
-          const data = await res.json() as { flights: Array<{ price: number }> }
-          return { date, price: data.flights[0]?.price ?? null }
-        }),
-      )
-      const resolved = results.map((r, i) =>
-        r.status === 'fulfilled' ? r.value : { date: dates[i], price: null },
-      )
-      setDays(resolved)
-      const withPrice = resolved.filter(d => d.price !== null)
-      if (withPrice.length) {
-        setCheapestDate(withPrice.reduce((a, b) => a.price! < b.price! ? a : b).date)
-      }
-      setLoading(false)
-    }
-    fetchPrices()
-  }, [flyFrom, flyTo, baseDate])
+    fetch(`/api/calendar?from=${flyFrom}&to=${flyTo}&month=${targetMonth}`)
+      .then(r => r.json())
+      .then(data => {
+        const entries: DayPrice[] = (data.calendar || []).map(
+          (c: { date: string; price: number }) => ({ date: c.date, price: c.price })
+        )
+        // Show up to 7 days from the calendar response
+        const slice = entries.slice(0, 7)
+        setDays(slice)
+        const withPrice = slice.filter(d => d.price !== null)
+        if (withPrice.length) {
+          setCheapestDate(withPrice.reduce((a, b) => a.price! < b.price! ? a : b).date)
+        }
+      })
+      .catch(() => setDays([]))
+      .finally(() => setLoading(false))
+  }, [flyFrom, flyTo, month])
 
   const prices = days.map(d => d.price).filter((p): p is number => p !== null)
   const min = Math.min(...prices)
@@ -78,15 +62,20 @@ export default function PriceCalendar({ flyFrom, flyTo, baseDate }: PriceCalenda
           ? Array.from({ length: 7 }, (_, i) => (
               <div key={i} className="h-8 rounded bg-placeholder animate-pulse" />
             ))
-          : days.map(day => {
-              const s = day.price ? cellStyle(day.price, min, max) : null
-              return (
-                <div key={day.date} className="text-center py-[2px] rounded text-[8px]"
-                  style={s ? { background: s.bg, color: s.color } : { color: 'var(--color-ink-muted)' }}>
-                  {day.price ? `$${day.price}` : '—'}
-                </div>
-              )
-            })}
+          : days.length === 0
+            ? Array.from({ length: 7 }, (_, i) => (
+                <div key={i} className="h-8 rounded bg-surface-2 flex items-center justify-center text-[8px] text-ink-muted">—</div>
+              ))
+            : days.map(day => {
+                const s = day.price ? cellStyle(day.price, min, max) : null
+                return (
+                  <div key={day.date} className="text-center py-[2px] rounded text-[8px]"
+                    style={s ? { background: s.bg, color: s.color } : { color: 'var(--color-ink-muted)' }}>
+                    {day.price ? `$${day.price}` : '—'}
+                  </div>
+                )
+              })
+        }
       </div>
       {cheapestDate && (
         <div className="text-[8px] text-ink-muted mt-1.5">

@@ -100,6 +100,23 @@ export interface DestinationInput {
   price: number
 }
 
+// Lightweight Haiku parse for AI search — fast, cheap, no full ParsedQuery needed
+export async function parseAISearchQuery(query: string): Promise<{ origin: string; budget: number; vibes: string[] }> {
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      system: 'Extract flight search params from this query. Return ONLY valid JSON with keys: origin (IATA, default ATL), budget (number, default 500), vibes (array of strings from: beach, city, warm, cold, nature, culture, party, adventure). No markdown, no explanation.',
+      messages: [{ role: 'user', content: query }],
+    })
+    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim()
+    return JSON.parse(cleaned)
+  } catch {
+    return { origin: 'ATL', budget: 500, vibes: [] }
+  }
+}
+
 export async function rankByVibe(
   destinations: DestinationInput[],
   vibe: string,

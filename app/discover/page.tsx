@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import ChatPanel from '@/components/ChatPanel'
-import type { FlightResult } from '@/lib/tequila'
+import type { FlightResult } from '@/lib/travelpayouts'
 
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false })
 

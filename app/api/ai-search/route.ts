@@ -1,16 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseNLQuery, rankByVibe } from '@/lib/claude'
-import { searchFlights, searchAnywhere } from '@/lib/tequila'
+import { parseAISearchQuery } from '@/lib/claude'
+import { searchAnywhere, IATA_CITY, type TravelpayoutsTicket } from '@/lib/travelpayouts'
 import { fetchMultipleCityPhotos } from '@/lib/unsplash'
 
-function getDateRange(offsetDays = 7, windowDays = 7): { from: string; to: string } {
-  const from = new Date()
-  from.setDate(from.getDate() + offsetDays)
-  const to = new Date(from)
-  to.setDate(to.getDate() + windowDays)
+// Normalize TravelpayoutsTicket to FlightResult shape for ChatPanel/FlightCard
+function normalize(f: TravelpayoutsTicket) {
+  const cityName = IATA_CITY[f.destination] ?? f.destination
+  const marker = process.env.TRAVELPAYOUTS_MARKER ?? ''
+  const markerParam = marker ? `marker=${marker}&` : ''
+  const bookingLink = f.bookingLink !== '#'
+    ? f.bookingLink
+    : `https://www.aviasales.com/search/${f.origin}${f.destination}1?${markerParam}utm_source=farely`
+
   return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
+    id: f.destination,
+    flyFrom: f.origin,
+    flyTo: f.destination,
+    cityFrom: f.origin,
+    cityTo: cityName,
+    countryFrom: { name: '', code: '' },
+    countryTo: { name: '', code: '' },
+    price: f.price,
+    currency: 'USD',
+    dTime: 0,
+    aTime: 0,
+    duration: { departure: f.duration as any, return: 0, total: 0 },
+    airlines: f.airline ? [f.airline] : [],
+    deep_link: bookingLink,
+    route: [],
   }
 }
 
@@ -22,61 +39,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'query is required' }, { status: 400 })
     }
 
-    // Step 1: Parse natural language query
-    const parsed = await parseNLQuery(query)
-    const flyFrom = parsed.origin ?? origin ?? 'LAX'
+    // Step 1: Parse query with Claude Haiku
+    const parsed = await parseAISearchQuery(query)
+    // TODO: detect user location via IP geolocation
+    const flyFrom = parsed.origin || origin || 'ATL'
 
-    // Step 2: Fetch flights from Tequila
-    const { from, to } = getDateRange(7, 14)
-    const dateFrom = parsed.departDate ?? from
-    const dateTo = parsed.departDate ?? to
+    // Step 2: Fetch cheapest destinations from Travelpayouts
+    const rawFlights = await searchAnywhere({
+      from: flyFrom,
+      budget: parsed.budget ?? 500,
+    })
 
-    let flights
-    if (parsed.isOpenDestination || !parsed.destination) {
-      flights = await searchAnywhere(flyFrom, dateFrom, dateTo, 20)
-    } else {
-      flights = await searchFlights({
-        fly_from: flyFrom,
-        fly_to: parsed.destination,
-        date_from: dateFrom,
-        date_to: dateTo,
-        adults: parsed.passengers,
-        selected_cabins: parsed.cabin,
-        price_to: parsed.budget ?? undefined,
-        limit: 20,
-      })
-    }
+    const flights = rawFlights.map(normalize)
 
     if (flights.length === 0) {
       return NextResponse.json({ results: [], parsed, message: 'No flights found for this query.' })
     }
 
-    // Step 3: Rank by vibe using Claude
-    const vibeString = parsed.vibes.length > 0 ? parsed.vibes.join(', ') : query
-    const destinations = flights.map(f => ({
-      iataCode: f.flyTo,
-      cityName: f.cityTo,
-      country: f.countryTo.name,
-      price: f.price,
-    }))
-
-    const ranked = await rankByVibe(destinations, vibeString)
-
-    // Step 4: Merge ranking data with flight data
-    const rankMap = new Map(ranked.map(r => [r.iataCode, r]))
-    const mergedFlights = flights
-      .map(f => ({
-        ...f,
-        ranking: rankMap.get(f.flyTo),
-      }))
-      .sort((a, b) => (b.ranking?.score ?? 0) - (a.ranking?.score ?? 0))
-      .slice(0, 12)
-
-    // Step 5: Fetch photos
-    const cities = Array.from(new Set(mergedFlights.map(f => f.cityTo)))
+    // Step 3: Fetch city photos
+    const cities = Array.from(new Set(flights.map(f => f.cityTo)))
     const photos = await fetchMultipleCityPhotos(cities)
 
-    const results = mergedFlights.map(f => ({
+    // Step 4: Return top 6 results with photos
+    const results = flights.slice(0, 6).map(f => ({
       ...f,
       photo: photos[f.cityTo] ?? null,
     }))
