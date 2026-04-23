@@ -1,10 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import ChatPanel from '@/components/ChatPanel'
-import NavTabs from '@/components/NavTabs'
 import type { FlightResult } from '@/lib/tequila'
 
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false })
@@ -14,36 +14,50 @@ type EnrichedFlight = FlightResult & {
   ranking?: { score?: number; reason?: string; tags?: string[] }
 }
 
-const COORD_MAP: Record<string, [number, number]> = {
-  'MX': [-99.1, 19.4], 'JP': [139.7, 35.7], 'FR': [2.3, 48.9], 'GB': [-0.1, 51.5],
-  'TH': [100.5, 13.8], 'IT': [12.5, 41.9], 'ES': [-3.7, 40.4], 'AU': [151.2, -33.9],
-  'BR': [-43.2, -22.9], 'DE': [13.4, 52.5], 'PE': [-77.0, -12.0], 'CR': [-84.1, 9.9],
-  'US': [-95.7, 37.1], 'CA': [-79.4, 43.7], 'CL': [-70.7, -33.5], 'CO': [-74.1, 4.7],
-  'PT': [-9.1, 38.7], 'GR': [23.7, 37.9],
+// IATA → [lng, lat] for mock anywhere results
+const DEST_COORDS: Record<string, [number, number]> = {
+  'CUN': [-86.9, 21.0], 'MIA': [-80.3, 25.8], 'JFK': [-73.8, 40.6],
+  'SJU': [-66.0, 18.4], 'LAX': [-118.4, 33.9], 'MEX': [-99.1, 19.4],
+  'LHR': [-0.5, 51.5],  'CDG': [2.5, 49.0],   'NRT': [140.4, 35.8],
+  'YVR': [-123.2, 49.2],
 }
+
+const ORIGIN_COORD: [number, number] = [-84.4, 33.7] // ATL
 
 function DiscoverInner() {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get('q') ?? undefined
   const [results, setResults] = useState<EnrichedFlight[]>([])
+  const [anywhereFlights, setAnywhereFlights] = useState<any[]>([])
 
-  const originCoord: [number, number] = [-118.2, 33.9]
-  const arcs = results.slice(0, 8).map(f => ({
-    from: originCoord,
-    to: (COORD_MAP[f.countryTo.code] ?? [0, 0]) as [number, number],
-    label: f.cityTo,
-  }))
+  useEffect(() => {
+    fetch('/api/anywhere')
+      .then(r => r.json())
+      .then(data => setAnywhereFlights(data.flights || []))
+      .catch(() => {})
+  }, [])
+
+  const arcs = (results.length > 0 ? results : anywhereFlights).slice(0, 8).map((f: any) => {
+    const iata = f.flyTo ?? f.fly_to ?? ''
+    const coord = DEST_COORDS[iata] ?? [0, 0]
+    return {
+      from: ORIGIN_COORD,
+      to: coord as [number, number],
+      label: f.cityTo ?? f.city_to ?? iata,
+    }
+  })
 
   return (
     <main className="min-h-screen bg-page py-5 px-4 pb-20">
-      <NavTabs />
       <div className="max-w-[900px] mx-auto border border-stroke rounded-xl overflow-hidden bg-surface">
 
         {/* Nav */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-stroke-light flex-wrap">
-          <div className="w-14 h-6 bg-surface-2 border border-stroke rounded-lg flex items-center justify-center text-[10px] font-semibold text-ink flex-shrink-0">
-            LOGO
-          </div>
+          <Link href="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
+            <span style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.5px', color: '#0a0a0a' }}>
+              fare<span style={{ color: '#1D9E75' }}>ly</span>
+            </span>
+          </Link>
           <div className="flex-1 min-w-[100px] h-8 border border-dashed border-stroke rounded-lg bg-surface-3 flex items-center px-2.5 gap-1.5"
             style={{ borderWidth: '1.5px' }}>
             <span className="text-[11px]">✨</span>
@@ -61,17 +75,7 @@ function DiscoverInner() {
         <div className="flex" style={{ minHeight: 460 }}>
           {/* Map */}
           <div className="flex-1 bg-page border-r border-stroke-light flex flex-col items-center justify-center gap-2 p-5">
-            <WorldMap arcs={arcs} origin={originCoord} className="w-full" style={{ height: 320 } as React.CSSProperties} />
-            <div className="flex flex-col gap-1 p-3 bg-surface border border-stroke-light rounded-lg self-start w-full max-w-[200px]">
-              <div className="text-[9px] text-[#1D9E75]">• Multiple destination pins</div>
-              <div className="text-[9px] text-ink-muted">• Color-coded by price tier</div>
-              <div className="text-[9px] text-ink-muted">• Filtering updates map in real time</div>
-            </div>
-            <div className="flex gap-1.5 flex-wrap justify-center">
-              <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#E6F1FB] text-[#185FA5]">Mapbox / D3</span>
-              <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#E1F5EE] text-[#0F6E56]">Kiwi Tequila</span>
-              <span className="inline-flex items-center text-[9px] font-medium px-[7px] py-[2px] rounded-full bg-[#EEEDFE] text-[#534AB7]">Claude API</span>
-            </div>
+            <WorldMap arcs={arcs} origin={ORIGIN_COORD} className="w-full" style={{ height: 320 } as React.CSSProperties} />
           </div>
 
           {/* Chat panel */}
