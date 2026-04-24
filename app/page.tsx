@@ -6,36 +6,11 @@ import SearchBar from '@/components/SearchBar'
 import AIPromptBar from '@/components/AIPromptBar'
 import DealCard from '@/components/DealCard'
 import MapSection from '@/components/MapSection'
+import { IATA_META } from '@/lib/iata-meta'
 
 // TODO: detect user location via IP geolocation
 const ORIGIN = 'ATL'
 const ORIGIN_COORD: [number, number] = [-84.4, 33.7]
-
-// City+country metadata for IATA codes returned by Travelpayouts
-const IATA_META: Record<string, { city: string; country: string }> = {
-  MIA: { city: 'Miami',         country: 'Florida'      },
-  JFK: { city: 'New York',      country: 'New York'     },
-  LAX: { city: 'Los Angeles',   country: 'California'   },
-  MEX: { city: 'Mexico City',   country: 'Mexico'       },
-  CUN: { city: 'Cancún',        country: 'Mexico'       },
-  SJU: { city: 'San Juan',      country: 'Puerto Rico'  },
-  LHR: { city: 'London',        country: 'England'      },
-  CDG: { city: 'Paris',         country: 'France'       },
-  NRT: { city: 'Tokyo',         country: 'Japan'        },
-  YVR: { city: 'Vancouver',     country: 'Canada'       },
-  ORD: { city: 'Chicago',       country: 'Illinois'     },
-  DFW: { city: 'Dallas',        country: 'Texas'        },
-  DEN: { city: 'Denver',        country: 'Colorado'     },
-  SFO: { city: 'San Francisco', country: 'California'   },
-  BOS: { city: 'Boston',        country: 'Massachusetts'},
-  SEA: { city: 'Seattle',       country: 'Washington'   },
-  LIS: { city: 'Lisbon',        country: 'Portugal'     },
-  BCN: { city: 'Barcelona',     country: 'Spain'        },
-  FCO: { city: 'Rome',          country: 'Italy'        },
-  AMS: { city: 'Amsterdam',     country: 'Netherlands'  },
-  BKK: { city: 'Bangkok',       country: 'Thailand'     },
-  SYD: { city: 'Sydney',        country: 'Australia'    },
-}
 
 const COORD_MAP: Record<string, [number, number]> = {
   CUN: [-86.9, 21.0], MIA: [-80.3, 25.8], JFK: [-73.8, 40.6],
@@ -45,6 +20,11 @@ const COORD_MAP: Record<string, [number, number]> = {
   DEN: [-104.9, 39.7], SFO: [-122.4, 37.8], BOS: [-71.1, 42.4],
   SEA: [-122.3, 47.6], LIS: [-9.1, 38.7], BCN: [2.1, 41.4],
   FCO: [12.5, 41.9], AMS: [4.9, 52.3], BKK: [100.5, 13.8], SYD: [151.2, -33.9],
+  BWI: [-76.7, 39.2],  CLE: [-81.8, 41.4], FLL: [-80.2, 26.1],
+  TPA: [-82.5, 27.9],  HOU: [-95.3, 29.6], MSY: [-90.3, 29.9],
+  STL: [-90.4, 38.7],  ORL: [-81.3, 28.4], CHI: [-87.9, 41.9],
+  WAS: [-77.0, 38.9],  PHX: [-112.0, 33.4], LAS: [-115.2, 36.1],
+  AUS: [-97.7, 30.2],  ORF: [-76.0, 36.9],  NYC: [-73.8, 40.6],
 }
 
 interface Deal {
@@ -63,23 +43,46 @@ export default function HomePage() {
 
   useEffect(() => {
     // TODO: detect user location via IP geolocation
-    fetch(`/api/anywhere?from=${ORIGIN}&budget=800`)
+    fetch(`/api/anywhere?from=${ORIGIN}&budget=1500`)
       .then(r => r.json())
-      .then(data => {
+      .then(async data => {
+        console.log('anywhere response:', data)
         const flights: any[] = data.flights || []
         if (flights.length === 0) return
-        const mapped: Deal[] = flights.slice(0, 10).map(f => {
-          const meta = IATA_META[f.destination] ?? { city: f.destination, country: '' }
-          return {
-            city: meta.city,
-            country: meta.country,
-            iata: f.destination,
-            price: f.price,
-            stops: f.stops,
-            duration: f.duration,
-          }
-        })
-        setDeals(mapped)
+
+        const top = flights.slice(0, 10)
+
+        const resolveAll = async (flights: any[]) => {
+          // Resolve any IATAs not covered by the static table via autocomplete
+          const unknownIatas = [...new Set(
+            flights.map((f: any) => f.destination as string).filter(iata => !IATA_META[iata])
+          )]
+          const fallback: Record<string, { city: string; country: string }> = {}
+          await Promise.allSettled(
+            unknownIatas.map(async iata => {
+              const r = await fetch(
+                `https://autocomplete.travelpayouts.com/places2?term=${iata}&locale=en&types[]=airport&types[]=city`
+              )
+              const suggestions = await r.json()
+              const match = suggestions[0]
+              if (match) fallback[iata] = { city: match.name || iata, country: match.country_name || '' }
+            })
+          )
+          const mapped: Deal[] = flights.map((f: any) => {
+            const meta = IATA_META[f.destination] ?? fallback[f.destination] ?? { city: f.destination, country: '' }
+            return {
+              city: meta.city,
+              country: meta.country,
+              iata: f.destination,
+              price: f.price,
+              stops: f.stops,
+              duration: f.duration,
+            }
+          })
+          setDeals(mapped)
+        }
+
+        resolveAll(top)
       })
       .catch(() => {})
       .finally(() => setDealsLoading(false))

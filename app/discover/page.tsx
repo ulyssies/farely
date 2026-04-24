@@ -6,6 +6,7 @@ import { Suspense, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import ChatPanel from '@/components/ChatPanel'
 import type { FlightResult } from '@/lib/travelpayouts'
+import { IATA_META } from '@/lib/iata-meta'
 
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false })
 
@@ -43,7 +44,7 @@ function DiscoverInner() {
     return {
       from: ORIGIN_COORD,
       to: coord as [number, number],
-      label: f.cityTo ?? f.city_to ?? iata,
+      label: IATA_META[iata]?.city ?? f.cityTo ?? f.city_to ?? iata,
     }
   })
 
