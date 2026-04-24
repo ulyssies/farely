@@ -50,6 +50,12 @@ function normalizeTicket(origin: string, iata: string, ticket: any): Travelpayou
   }
 }
 
+function toAviasalesDate(isoDate: string): string {
+  if (!isoDate) return ''
+  const [, month, day] = isoDate.slice(0, 10).split('-')
+  return `${day}${month}` // DDMM
+}
+
 // Screen 2 — specific route search
 export async function searchRoute({
   from,
@@ -83,7 +89,6 @@ export async function searchRoute({
         const durationMins = ticket.duration_to || ticket.duration || 0
         const hrs = Math.floor(durationMins / 60)
         const mins = durationMins % 60
-        const dateStr = (ticket.departure_at || '').slice(0, 10).replace(/-/g, '').slice(4, 8)
         return {
           origin: from,
           destination: to,
@@ -94,7 +99,7 @@ export async function searchRoute({
           duration: durationMins > 0 ? `${hrs}h ${mins}m` : 'N/A',
           departureAt: ticket.departure_at || '',
           returnAt: ticket.return_at || '',
-          bookingLink: `https://www.aviasales.com/search/${from}${dateStr}${to}1?${markerParam}utm_source=farely`,
+          bookingLink: `https://www.aviasales.com/search/${from}${toAviasalesDate(ticket.departure_at)}${to}1?${markerParam}utm_source=farely`,
         }
       })
 
@@ -130,7 +135,6 @@ export async function searchAnywhere({
         const durationMins = cheapest.duration_to || cheapest.duration || 0
         const hrs = Math.floor(durationMins / 60)
         const mins = durationMins % 60
-        const dateStr = (cheapest.departure_at || '').slice(0, 10).replace(/-/g, '').slice(4, 8)
 
         return {
           origin: from,
@@ -142,7 +146,7 @@ export async function searchAnywhere({
           duration: durationMins > 0 ? `${hrs}h ${mins}m` : 'N/A',
           departureAt: cheapest.departure_at || '',
           returnAt: cheapest.return_at || '',
-          bookingLink: `https://www.aviasales.com/search/${from}${dateStr}${iata}1?${markerParam}utm_source=farely`,
+          bookingLink: `https://www.aviasales.com/search/${from}${toAviasalesDate(cheapest.departure_at)}${iata}1?${markerParam}utm_source=farely`,
         }
       })
       .filter(r => r.price <= budget)
