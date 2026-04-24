@@ -105,12 +105,14 @@ Flight App/
 - **results/page.tsx is a client component** — reads `from/to/depart/return` URL params from SearchBar, fetches `/api/flights`, renders `FlightRow` cards with mean-based price color, BEST DEAL badge on first result, airline badge, departure time, Aviasales book button. Spinner uses "Searching {from} → {to}…" italic text. Also passes `month` to `PriceCalendar`. `departDate` defaults to 30 days out when not in URL. `setFlights([])` is called at the start of each new search to clear stale results.
 - **Booking links:** All Aviasales links are resolved to full URLs before use — `link.startsWith('http') ? link : 'https://www.aviasales.com' + link`. Book buttons use `window.open(..., '_blank', 'noopener,noreferrer')` (not `<a href>`) so Next.js router doesn't intercept the navigation.
 - **PriceCalendar** calls `/api/calendar?from=&to=&month=YYYY-MM` (single request) instead of 7 parallel calls.
-- **page.tsx** fetches `/api/anywhere?from=ATL&budget=800` on mount. Shows 10 animated skeleton cards while loading. Falls back to `FALLBACK_DEALS` on error. `IATA_META` object maps IATA codes → city+country for DealCard display.
+- **`/lib/iata-meta.ts`** — shared `IATA_META` table (~100 codes) imported by `page.tsx`, `discover/page.tsx`, and `api/ai-search/route.ts`. Covers US domestic, Canada, Mexico, Caribbean, Central/South America, Europe, Middle East, Asia, and Oceania.
+- **page.tsx** fetches `/api/anywhere?from=ATL&budget=1500` on mount. `resolveAll` resolves city names: IATA codes in `IATA_META` use the static lookup; unknowns hit the autocomplete API via `Promise.allSettled` (failures never block `setDeals`). Falls back to raw IATA code as last resort.
+- **ai-search/route.ts** — two Claude Haiku calls: (1) `parseAISearchQuery` extracts origin/budget/vibes; (2) ranking call reorders `searchAnywhere` results by vibe relevance before returning top 6. Falls back to cheapest-first if ranking call fails. City names use `IATA_META` instead of the old `IATA_CITY` lookup.
 - **discover/page.tsx** — fetches `/api/anywhere` on mount to seed map arcs. Chat results from ChatPanel override the arcs when present.
 - **ai-search/route.ts** — uses Claude Haiku (`claude-haiku-4-5-20251001`) to parse query into `{ origin, budget, vibes }`, calls `searchAnywhere`, fetches Unsplash photos, returns top 6 results. Uses `IATA_CITY` lookup for city names.
 - **Origin is hardcoded to ATL** on all three screens with `// TODO: detect user location via IP geolocation` comments. Replace these when geolocation is implemented.
 - **Price color** on all screens uses relative-to-mean logic: ≤80% of mean → green, ≤110% → amber, >110% → red. `getPriceColor(price, mean)` implemented locally in results page and DealCard.
-- **Affiliate links:** Aviasales format `https://www.aviasales.com/search/{FROM}{MMDD}{TO}1?marker={MARKER}&utm_source=farely`. `TRAVELPAYOUTS_MARKER` must be set for commission tracking.
+- **Affiliate links:** Aviasales format `https://www.aviasales.com/search/{FROM}{DDMM}{TO}1?marker={MARKER}&utm_source=farely`. Date is **DDMM** (not MMDD). `toAviasalesDate(isoDate)` in `lib/travelpayouts.ts` converts ISO strings by splitting on `-` and returning `${day}${month}`. `TRAVELPAYOUTS_MARKER` must be set for commission tracking.
 
 ---
 
@@ -188,13 +190,12 @@ The frontend-design skill (`/.claude/skills/frontend-design/SKILL.md`) enforces 
 
 ## Known Issues
 
-- `COORD_MAP` in `page.tsx` uses IATA-keyed coordinates — city-level precision needs a geocoding API
-- Tequila `fly_to=anywhere` returns IATA codes; city names come from `cityTo` field in response
+- `COORD_MAP` in `page.tsx` covers ~37 airports; destinations outside the map fall back to `[0, 0]` (center of map). A geocoding API would fix this properly.
+- `DealCard` image placeholder shows city name in gray during loading. Empty state (no Unsplash result or load error) shows a `REGION_GRADIENTS[iata]` gradient with white city name — never blank, never a broken-image icon. Unsplash search uses `city` name; falls back to `"travel destination"` for strings ≤3 chars.
 - SendGrid `from` address (`alerts@farely.app`) needs DNS verification before production
 - Price calendar cells retain light-mode colors in dark mode (intentional but slightly jarring)
 - WorldMap may flash on arc prop change — D3 re-renders full SVG on each `useEffect` run
-- No geolocation — origin hardcoded to ATL on homepage (LAX elsewhere)
-- DEALS array in `page.tsx` is hardcoded — TODO: replace with Tequila /v2/flights once key arrives
+- No geolocation — origin hardcoded to ATL on all screens with `// TODO` comments
 
 ---
 
