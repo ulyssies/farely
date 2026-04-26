@@ -10,7 +10,7 @@
 [![Claude](https://img.shields.io/badge/Anthropic-Claude-c96442?style=for-the-badge)](https://anthropic.com)
 [![Travelpayouts](https://img.shields.io/badge/Travelpayouts-API-1D9E75?style=for-the-badge)](https://travelpayouts.com)
 
-> **Note:** Active development — add API keys, test all three screens, and review [known limitations](#known-limitations--roadmap) before shipping.
+> **Note:** Active development — all travel API's currently are locked behind monthly revenue or user amount, this project is retired until an alternative can be found. The website works and the core features work but the database is so small and constringent that it doesn't make sense to pursue. 
 
 </div>
 
